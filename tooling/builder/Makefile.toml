@@ -1,0 +1,8 @@
+[tasks.dev]
+env = { RUST_LOG = "info" }
+command = "cargo"
+args = ["run"]
+
+[tasks.release]
+command = "cargo"
+args = ["run", "--release"]
