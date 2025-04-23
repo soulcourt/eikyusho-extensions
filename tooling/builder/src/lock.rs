@@ -2,8 +2,7 @@ use crate::util;
 use eks_validator::structs::Metadata;
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
-
+use std::path::{Path, PathBuf};
 
 /// Returns true if the extension needs to be built:
 /// - It's not present in the lock file, or
@@ -54,19 +53,38 @@ pub(crate) fn add_entry_to_lock(
 	lock.insert(metadata.extension.slug.clone(), entry);
 }
 
-// fn check_extensions_against_lock(project_root: &PathBuf, slugs: Vec<String>)
-// { 	match read_metadata_lock(project_root) {
-// 		Ok(metadata) => {
-// 			for slug in slugs {
-// 				if metadata.contains_key(&slug) {
-// 					println!("✅ Extension '{}' is already in the lock file", slug);
-// 				} else {
-// 					println!("❌ Extension '{}' is NOT in the lock file", slug);
-// 				}
-// 			}
-// 		}
-// 		Err(err) => {
-// 			eprintln!("Error loading metadata lock: {}", err);
-// 		}
-// 	}
-// }
+pub(crate) fn check_extensions_against_lock(
+	lock_data: &HashMap<String, HashMap<String, String>>,
+	extensions_src_dir: &Path,
+) -> Vec<String> {
+	let mut stale_entries = Vec::new();
+
+	for slug in lock_data.keys() {
+		let parts: Vec<&str> = slug.split('.').collect();
+
+		if parts.len() < 2 {
+			log::warn!("Invalid slug format: {}", slug);
+			continue;
+		}
+
+		let lang = parts[0];
+		let ext_name = parts[1];
+		let ext_path = extensions_src_dir.join(lang).join(ext_name);
+
+		if !ext_path.exists() {
+			stale_entries.push(slug.clone());
+		}
+	}
+
+	stale_entries
+}
+
+pub(crate) fn remove_stale_entries_from_lock(
+	lock_data: &mut HashMap<String, HashMap<String, String>>,
+	stale_slugs: &[String],
+) {
+	for slug in stale_slugs {
+		lock_data.remove(slug);
+		log::info!("Removed stale lock entry: {}", slug);
+	}
+}

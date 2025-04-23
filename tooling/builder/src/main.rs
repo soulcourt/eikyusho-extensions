@@ -23,6 +23,16 @@ fn main() {
 	};
 
 	process_languages(&extensions_src_dir, &project_root, &mut lock);
+
+	let stale = lock::check_extensions_against_lock(&lock, &extensions_src_dir);
+
+	if !stale.is_empty() {
+		lock::remove_stale_entries_from_lock(&mut lock, &stale);
+
+		if let Err(err) = lock::write_metadata_lock(&project_root, &lock) {
+			log::error!("Failed to write metadata-lock.toml: {}", err);
+		}
+	}
 }
 
 fn process_languages(
