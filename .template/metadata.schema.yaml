@@ -19,7 +19,9 @@ properties:
         pattern: "^[a-z]{2}\\.[a-z0-9]+$"
       name:
         type: string
-      version:
+      version_code:
+        type: number
+      version_name:
         type: string
         pattern: "^\\d+\\.\\d+\\.\\d+$"
       language:

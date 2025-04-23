@@ -1,7 +1,8 @@
-use std::{fs, path::PathBuf, process::Command};
-use eks_validator::{validate_metadata};
 use eks_validator::structs::Metadata;
+use std::collections::HashMap;
+use std::{fs, path::PathBuf, process::Command};
 
+mod lock;
 mod util;
 
 fn main() {
@@ -14,10 +15,21 @@ fn main() {
 		util::exit(1, "Extensions source directory does not exist.", true);
 	}
 
-	process_languages(&extensions_src_dir, &project_root);
+	let mut lock = match util::read_metadata_lock(&project_root) {
+		Ok(metadata) => metadata,
+		Err(_) => {
+			util::exit(1, "Error loading metadata lock", true);
+		}
+	};
+
+	process_languages(&extensions_src_dir, &project_root, &mut lock);
 }
 
-fn process_languages(extensions_src_dir: &PathBuf, project_root: &PathBuf) {
+fn process_languages(
+	extensions_src_dir: &PathBuf,
+	project_root: &PathBuf,
+	mut lock: &mut HashMap<String, HashMap<String, String>>,
+) {
 	for lang in fs::read_dir(extensions_src_dir).unwrap() {
 		let lang_path = lang.unwrap().path();
 
@@ -29,11 +41,15 @@ fn process_languages(extensions_src_dir: &PathBuf, project_root: &PathBuf) {
 			);
 		}
 
-		process_extensions_in_language(&lang_path, &project_root);
+		process_extensions_in_language(&lang_path, &project_root, &mut lock);
 	}
 }
 
-fn process_extensions_in_language(lang_path: &PathBuf, project_root: &PathBuf) {
+fn process_extensions_in_language(
+	lang_path: &PathBuf,
+	project_root: &PathBuf,
+	mut lock: &mut HashMap<String, HashMap<String, String>>,
+) {
 	for ext_entry in fs::read_dir(&lang_path).unwrap() {
 		let ext_path = ext_entry.unwrap().path();
 
@@ -41,29 +57,33 @@ fn process_extensions_in_language(lang_path: &PathBuf, project_root: &PathBuf) {
 			continue;
 		}
 
-		if let Some(_) = read_and_validate_metadata(&ext_path, &project_root) {
+		let metadata = match util::read_and_validate_metadata(&ext_path, &project_root) {
+			Some(m) => m,
+			None => return,
+		};
+
+		if should_build(&metadata, &project_root, &mut lock) {
 			build_extension(&ext_path);
 		}
 	}
 }
 
-fn read_and_validate_metadata(ext_path: &PathBuf, project_root: &PathBuf) -> Option<Metadata> {
-	let display_path = ext_path.strip_prefix(&project_root.join("src")).unwrap();
-
-	let metadata = match util::read_metadata(ext_path) {
-		Ok(m) => m,
-		Err(err) => {
-			log::warn!("Skipping {:?}: {}", display_path, err);
-			return None;
+fn should_build(
+	metadata: &Metadata,
+	project_root: &PathBuf,
+	mut lock: &mut HashMap<String, HashMap<String, String>>,
+) -> bool {
+	match lock.contains_key(&metadata.extension.slug) {
+		true => lock::extension_requires_build(&metadata, &lock),
+		false => {
+			lock::add_entry_to_lock(&mut lock, &metadata);
+			match lock::write_metadata_lock(&project_root, &lock) {
+				Ok(()) => log::info!("Lock file updated!"),
+				Err(err) => log::error!("Error updating lock file: {}", err),
+			}
+			true
 		}
-	};
-
-	if let Err(err) = validate_metadata(&metadata) {
-		log::warn!("Skipping {:?}: {}", display_path, err);
-		return None;
 	}
-
-	Some(metadata)
 }
 
 fn build_extension(extension_path: &PathBuf) {

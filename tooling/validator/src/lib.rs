@@ -13,8 +13,8 @@ pub fn validate_metadata(metadata: &Metadata) -> Result<(), String> {
         return Err("Field `name` is empty.".to_string());
     }
 
-    if extension.version.trim().is_empty() {
-        return Err("Field `version` is empty.".to_string());
+    if extension.version_name.trim().is_empty() {
+        return Err("Field `version_name` is empty.".to_string());
     }
 
     if extension.language.trim().is_empty() {

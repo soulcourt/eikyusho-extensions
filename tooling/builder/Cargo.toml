@@ -3,9 +3,10 @@ name = "eks_builder"
 edition = "2024"
 
 [dependencies]
-log = "0.4"
+log = "0.4.27"
 env_logger = "0.11.8"
-figment = { version ="0.10.19", features = ["yaml"] }
-serde = { version = "1.0.219", features = ["derive"] }
+figment = { version ="0.10.19", features = ["yaml", "toml"] }
+toml = "0.8.20"
+uuid = { version = "1", features = ["v4"] }
 
 eks_validator = { path = "../validator" }
