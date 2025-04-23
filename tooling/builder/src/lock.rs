@@ -53,6 +53,28 @@ pub(crate) fn add_entry_to_lock(
 	lock.insert(metadata.extension.slug.clone(), entry);
 }
 
+pub(crate) fn update_lock_entry(
+	lock: &mut HashMap<String, HashMap<String, String>>,
+	metadata: &Metadata,
+) {
+	if let Some(existing_entry) = lock.get_mut(&metadata.extension.slug) {
+		existing_entry.insert(
+			"version_code".to_string(),
+			metadata.extension.version_code.to_string(),
+		);
+		log::info!(
+            "Updated version_code for '{}' to {}",
+            metadata.extension.slug,
+            metadata.extension.version_code
+        );
+	} else {
+		log::error!(
+            "Cannot update version_code: '{}' not found in metadata lock",
+            metadata.extension.slug
+        );
+	}
+}
+
 pub(crate) fn check_extensions_against_lock(
 	lock_data: &HashMap<String, HashMap<String, String>>,
 	extensions_src_dir: &Path,

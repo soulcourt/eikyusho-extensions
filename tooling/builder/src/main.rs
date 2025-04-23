@@ -84,15 +84,29 @@ fn should_build(
 	mut lock: &mut HashMap<String, HashMap<String, String>>,
 ) -> bool {
 	match lock.contains_key(&metadata.extension.slug) {
-		true => lock::extension_requires_build(&metadata, &lock),
+		true => {
+			let build_required = lock::extension_requires_build(&metadata, &lock);
+
+			if build_required {
+				lock::update_lock_entry(&mut lock, &metadata);
+				persist_lock(&lock, &project_root);
+			}
+
+			build_required
+		},
 		false => {
 			lock::add_entry_to_lock(&mut lock, &metadata);
-			match lock::write_metadata_lock(&project_root, &lock) {
-				Ok(()) => log::info!("Lock file updated!"),
-				Err(err) => log::error!("Error updating lock file: {}", err),
-			}
+			persist_lock(&lock, &project_root);
 			true
 		}
+	}
+}
+
+
+fn persist_lock(lock: &HashMap<String, HashMap<String, String>>, project_root: &PathBuf) {
+	match lock::write_metadata_lock(project_root, lock) {
+		Ok(()) => log::info!("Lock file updated!"),
+		Err(err) => log::error!("Error updating lock file: {}", err),
 	}
 }
 
