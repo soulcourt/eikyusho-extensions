@@ -1,6 +1,7 @@
 use std::{fs, path::PathBuf, process::Command};
+use eks_validator::{validate_metadata};
+use eks_validator::structs::Metadata;
 
-mod structs;
 mod util;
 
 fn main() {
@@ -13,6 +14,10 @@ fn main() {
 		util::exit(1, "Extensions source directory does not exist.", true);
 	}
 
+	process_languages(&extensions_src_dir, &project_root);
+}
+
+fn process_languages(extensions_src_dir: &PathBuf, project_root: &PathBuf) {
 	for lang in fs::read_dir(extensions_src_dir).unwrap() {
 		let lang_path = lang.unwrap().path();
 
@@ -24,31 +29,41 @@ fn main() {
 			);
 		}
 
-		for ext_entry in fs::read_dir(&lang_path).unwrap() {
-			let ext_path = ext_entry.unwrap().path();
+		process_extensions_in_language(&lang_path, &project_root);
+	}
+}
 
-			if !ext_path.is_dir() || !util::has_cargo_toml(&ext_path) {
-				continue;
-			}
+fn process_extensions_in_language(lang_path: &PathBuf, project_root: &PathBuf) {
+	for ext_entry in fs::read_dir(&lang_path).unwrap() {
+		let ext_path = ext_entry.unwrap().path();
 
-			match util::read_metadata(&ext_path) {
-				Ok(_) => {
+		if !ext_path.is_dir() || !util::has_cargo_toml(&ext_path) {
+			continue;
+		}
 
-				}
-				Err(err) => {
-					let display_path = ext_path.strip_prefix(&project_root.join("src")).unwrap();
-					log::warn!(
-						"Skipping {:?}: {}",
-						display_path,
-						err
-					);
-					continue;
-				}
-			}
-
+		if let Some(_) = read_and_validate_metadata(&ext_path, &project_root) {
 			build_extension(&ext_path);
 		}
 	}
+}
+
+fn read_and_validate_metadata(ext_path: &PathBuf, project_root: &PathBuf) -> Option<Metadata> {
+	let display_path = ext_path.strip_prefix(&project_root.join("src")).unwrap();
+
+	let metadata = match util::read_metadata(ext_path) {
+		Ok(m) => m,
+		Err(err) => {
+			log::warn!("Skipping {:?}: {}", display_path, err);
+			return None;
+		}
+	};
+
+	if let Err(err) = validate_metadata(&metadata) {
+		log::warn!("Skipping {:?}: {}", display_path, err);
+		return None;
+	}
+
+	Some(metadata)
 }
 
 fn build_extension(extension_path: &PathBuf) {

@@ -1,9 +1,9 @@
-use crate::structs::Metadata;
 use figment::{
 	Figment,
 	providers::{Format, Yaml},
 };
 use std::{env, path::PathBuf};
+use eks_validator::{structs::Metadata};
 
 pub(crate) fn get_project_root() -> PathBuf {
 	env::current_dir()

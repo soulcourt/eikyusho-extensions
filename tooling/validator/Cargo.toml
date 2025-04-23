@@ -1,0 +1,6 @@
+[package]
+name = "eks_validator"
+edition = "2024"
+
+[dependencies]
+serde = { version = "1.0.219", features = ["derive"] }
