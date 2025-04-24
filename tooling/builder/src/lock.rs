@@ -1,4 +1,4 @@
-use crate::{lock, util};
+use crate::{util};
 use eks_validator::structs::Metadata;
 use std::collections::HashMap;
 use std::fs;

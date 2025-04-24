@@ -18,3 +18,5 @@ src/as/*/.wireit
 # Production
 /extensions
 /metadata-lock.toml
+/index.min.json
+/index.json

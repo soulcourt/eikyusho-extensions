@@ -5,6 +5,7 @@ use std::{fs, path::PathBuf, process::Command};
 mod lock;
 mod util;
 mod binary;
+mod server;
 
 fn main() {
 	env_logger::init();
@@ -23,19 +24,24 @@ fn main() {
 		}
 	};
 
-	process_languages(&extensions_src_dir, &project_root, &mut lock);
+	let mut all_metadata = vec![];
+
+	process_languages(&extensions_src_dir, &project_root, &mut lock, &mut all_metadata);
 
 	let stale = lock::check_extensions_against_lock(&lock, &extensions_src_dir);
 
 	if !stale.is_empty() {
 		lock::remove_stale_entries_from_lock(&project_root, &mut lock, &stale);
 	}
+
+	server::generate_server_index(&project_root, &all_metadata, &lock);
 }
 
 fn process_languages(
 	extensions_src_dir: &PathBuf,
 	project_root: &PathBuf,
 	mut lock: &mut HashMap<String, HashMap<String, String>>,
+	all_metadata: &mut Vec<Metadata>,
 ) {
 	for lang in fs::read_dir(extensions_src_dir).unwrap() {
 		let lang_path = lang.unwrap().path();
@@ -48,7 +54,7 @@ fn process_languages(
 			);
 		}
 
-		process_extensions_in_language(&lang_path, &project_root, &mut lock);
+		process_extensions_in_language(&lang_path, &project_root, &mut lock, all_metadata);
 	}
 }
 
@@ -56,6 +62,7 @@ fn process_extensions_in_language(
 	lang_path: &PathBuf,
 	project_root: &PathBuf,
 	mut lock: &mut HashMap<String, HashMap<String, String>>,
+	all_metadata: &mut Vec<Metadata>,
 ) {
 	for ext_entry in fs::read_dir(&lang_path).unwrap() {
 		let ext_path = ext_entry.unwrap().path();
@@ -68,6 +75,8 @@ fn process_extensions_in_language(
 			Some(m) => m,
 			None => return,
 		};
+
+		all_metadata.push(metadata.clone());
 
 		if should_build(&metadata, &project_root, &mut lock) {
 			let extension_built = build_extension(&ext_path);
@@ -129,3 +138,4 @@ fn build_extension(extension_path: &PathBuf) ->  bool {
 		false
 	}
 }
+
