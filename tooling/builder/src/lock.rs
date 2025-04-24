@@ -1,4 +1,4 @@
-use crate::util;
+use crate::{lock, util};
 use eks_validator::structs::Metadata;
 use std::collections::HashMap;
 use std::fs;
@@ -22,7 +22,7 @@ pub(crate) fn extension_requires_build(
 	}
 }
 
-pub fn write_metadata_lock(
+pub(crate) fn write_lock_file(
 	project_root: &PathBuf,
 	metadata: &HashMap<String, HashMap<String, String>>,
 ) -> Result<(), String> {
@@ -31,6 +31,13 @@ pub fn write_metadata_lock(
 	let toml_str = toml::to_string(metadata).map_err(|e| e.to_string())?;
 
 	fs::write(&lock_path, toml_str).map_err(|e| e.to_string())
+}
+
+pub(crate) fn persist_lock(lock: &HashMap<String, HashMap<String, String>>, project_root: &PathBuf) {
+	match write_lock_file(project_root, lock) {
+		Ok(()) => log::debug!("Lock file updated!"),
+		Err(err) => log::error!("Error updating lock file: {}", err),
+	}
 }
 
 pub(crate) fn add_entry_to_lock(
@@ -75,6 +82,13 @@ pub(crate) fn update_lock_entry(
 	}
 }
 
+pub(crate) fn get_lock_entry_id(
+	lock: &HashMap<String, HashMap<String, String>>,
+	slug: &str,
+) -> Option<String> {
+	lock.get(slug).and_then(|entry| entry.get("id").cloned())
+}
+
 pub(crate) fn check_extensions_against_lock(
 	lock_data: &HashMap<String, HashMap<String, String>>,
 	extensions_src_dir: &Path,
@@ -102,11 +116,16 @@ pub(crate) fn check_extensions_against_lock(
 }
 
 pub(crate) fn remove_stale_entries_from_lock(
+	project_root: &PathBuf,
 	lock_data: &mut HashMap<String, HashMap<String, String>>,
 	stale_slugs: &[String],
 ) {
 	for slug in stale_slugs {
 		lock_data.remove(slug);
 		log::info!("Removed stale lock entry: {}", slug);
+	}
+
+	if let Err(err) = write_lock_file(&project_root, &lock_data) {
+		log::error!("Failed to write metadata-lock.toml: {}", err);
 	}
 }

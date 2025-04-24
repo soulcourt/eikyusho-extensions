@@ -4,6 +4,7 @@ use std::{fs, path::PathBuf, process::Command};
 
 mod lock;
 mod util;
+mod binary;
 
 fn main() {
 	env_logger::init();
@@ -27,11 +28,7 @@ fn main() {
 	let stale = lock::check_extensions_against_lock(&lock, &extensions_src_dir);
 
 	if !stale.is_empty() {
-		lock::remove_stale_entries_from_lock(&mut lock, &stale);
-
-		if let Err(err) = lock::write_metadata_lock(&project_root, &lock) {
-			log::error!("Failed to write metadata-lock.toml: {}", err);
-		}
+		lock::remove_stale_entries_from_lock(&project_root, &mut lock, &stale);
 	}
 }
 
@@ -73,7 +70,15 @@ fn process_extensions_in_language(
 		};
 
 		if should_build(&metadata, &project_root, &mut lock) {
-			build_extension(&ext_path);
+			let extension_built = build_extension(&ext_path);
+			if extension_built {
+				binary::generate_extension_binary(
+					&ext_path,
+					&metadata.extension.slug,
+					&project_root,
+					&lock,
+				);
+			}
 		}
 	}
 }
@@ -89,28 +94,23 @@ fn should_build(
 
 			if build_required {
 				lock::update_lock_entry(&mut lock, &metadata);
-				persist_lock(&lock, &project_root);
+				lock::persist_lock(&lock, &project_root);
 			}
 
 			build_required
 		},
 		false => {
 			lock::add_entry_to_lock(&mut lock, &metadata);
-			persist_lock(&lock, &project_root);
+			lock::persist_lock(&lock, &project_root);
 			true
 		}
 	}
 }
 
 
-fn persist_lock(lock: &HashMap<String, HashMap<String, String>>, project_root: &PathBuf) {
-	match lock::write_metadata_lock(project_root, lock) {
-		Ok(()) => log::info!("Lock file updated!"),
-		Err(err) => log::error!("Error updating lock file: {}", err),
-	}
-}
 
-fn build_extension(extension_path: &PathBuf) {
+
+fn build_extension(extension_path: &PathBuf) ->  bool {
 	let status = Command::new("cargo")
 		.arg("+nightly")
 		.arg("build")
@@ -122,8 +122,10 @@ fn build_extension(extension_path: &PathBuf) {
 		.expect("Failed to run cargo build");
 
 	if status.success() {
-		log::info!("Built {:?}", extension_path);
+		log::debug!("Built {:?}", extension_path);
+		true
 	} else {
 		log::error!("Build failed for {:?}", extension_path);
+		false
 	}
 }

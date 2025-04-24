@@ -14,3 +14,7 @@ src/as/*/.wireit
 .idea
 *.iml
 .zed
+
+# Production
+/extensions
+/metadata-lock.toml
