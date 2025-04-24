@@ -1,19 +1,19 @@
+use crate::lock;
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
-use crate::lock;
 
 pub(crate) fn generate_extension_binary(
 	extension_path: &PathBuf,
 	metadata_slug: &str,
-	project_root: &PathBuf,
+	project_root: &Path,
 	lock: &HashMap<String, HashMap<String, String>>,
 ) {
 	let target_dir = extension_path.join("target/wasm32-unknown-unknown/release");
 	let payload_dir = target_dir.join("Payload");
 
-	let id = match lock::get_lock_entry_id(&lock, &metadata_slug) {
+	let id = match lock::get_lock_entry_id(lock, metadata_slug) {
 		Some(id) => id,
 		None => {
 			log::error!("No ID found for slug {} in metadata-lock", metadata_slug);
@@ -21,15 +21,18 @@ pub(crate) fn generate_extension_binary(
 		}
 	};
 
-	let output_eks = project_root.join("extensions").join(&id).join("extension.eks");
+	let output_eks = project_root
+		.join("extensions")
+		.join(&id)
+		.join("extension.eks");
 
 	create_directories(&payload_dir, &output_eks);
-	
+
 	copy_resources(extension_path, &payload_dir);
 
 	copy_wasm(&payload_dir, &target_dir);
 
-	copy_icon(&extension_path, &project_root, &metadata_slug, &id);
+	copy_icon(extension_path, project_root, metadata_slug, &id);
 
 	let zip_status = Command::new("zip")
 		.arg("-qr")
@@ -46,7 +49,7 @@ pub(crate) fn generate_extension_binary(
 	}
 }
 
-fn create_directories(payload_dir: &PathBuf, output_eks: &PathBuf) {
+fn create_directories(payload_dir: &PathBuf, output_eks: &Path) {
 	if let Some(parent) = output_eks.parent() {
 		if let Err(e) = fs::create_dir_all(parent) {
 			log::error!("Failed to create output directory: {}", e);
@@ -54,13 +57,12 @@ fn create_directories(payload_dir: &PathBuf, output_eks: &PathBuf) {
 		}
 	}
 
-	if let Err(e) = fs::create_dir_all(&payload_dir) {
+	if let Err(e) = fs::create_dir_all(payload_dir) {
 		log::error!("Failed to create Payload directory: {}", e);
-		return;
 	}
 }
 
-fn copy_resources(extension_path: &PathBuf, payload_dir: &PathBuf) {
+fn copy_resources(extension_path: &PathBuf, payload_dir: &Path) {
 	let res_dir = extension_path.join("res");
 	if res_dir.exists() {
 		for entry in fs::read_dir(&res_dir).unwrap() {
@@ -79,8 +81,8 @@ fn copy_resources(extension_path: &PathBuf, payload_dir: &PathBuf) {
 	}
 }
 
-fn copy_wasm(payload_dir: &PathBuf, target_dir: &PathBuf) {
-	let wasm_files: Vec<_> = fs::read_dir(&target_dir)
+fn copy_wasm(payload_dir: &Path, target_dir: &Path) {
+	let wasm_files: Vec<_> = fs::read_dir(target_dir)
 		.unwrap()
 		.filter_map(|entry| {
 			let path = entry.unwrap().path();
@@ -102,11 +104,10 @@ fn copy_wasm(payload_dir: &PathBuf, target_dir: &PathBuf) {
 
 	if let Err(e) = fs::copy(wasm_src, &wasm_dst) {
 		log::error!("Failed to copy wasm file: {}", e);
-		return;
 	}
 }
 
-fn copy_icon(extension_path: &PathBuf, project_root: &PathBuf, metadata_slug: &str, id: &str) {
+fn copy_icon(extension_path: &Path, project_root: &Path, metadata_slug: &str, id: &str) {
 	let icon_src = extension_path.join("res").join("icon.png");
 	let icon_dst = project_root.join("extensions").join(id).join("icon.png");
 
@@ -116,7 +117,7 @@ fn copy_icon(extension_path: &PathBuf, project_root: &PathBuf, metadata_slug: &s
 	}
 
 	match fs::copy(&icon_src, &icon_dst) {
-		Ok(_) => {},
+		Ok(_) => {}
 		Err(e) => log::error!("Failed to copy icon for {}: {}", metadata_slug, e),
 	}
 }

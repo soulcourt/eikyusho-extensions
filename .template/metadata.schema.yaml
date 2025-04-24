@@ -24,7 +24,7 @@ properties:
         description: Human-readable name of the extension
       icon:
         type: string
-        description:  filename of the extension icon (e.g., `my-icon.png`). Must be one of (`.png`, `.jpg`, `.jpeg`, or `.webp`).
+        description: filename of the extension icon (e.g., `my-icon.png`). Must be one of (`.png`, `.jpg`, `.jpeg`, or `.webp`).
         pattern: "^[a-z0-9]+(-[a-z0-9]+)*\\.(png|jpe?g|webp)$"
       version_code:
         type: number

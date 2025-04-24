@@ -1,8 +1,8 @@
-use crate::{util};
+use crate::util;
 use eks_validator::structs::Metadata;
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Returns true if the extension needs to be built:
 /// - It's not present in the lock file, or
@@ -23,7 +23,7 @@ pub(crate) fn extension_requires_build(
 }
 
 pub(crate) fn write_lock_file(
-	project_root: &PathBuf,
+	project_root: &Path,
 	metadata: &HashMap<String, HashMap<String, String>>,
 ) -> Result<(), String> {
 	let lock_path = project_root.join("metadata-lock.toml");
@@ -33,7 +33,7 @@ pub(crate) fn write_lock_file(
 	fs::write(&lock_path, toml_str).map_err(|e| e.to_string())
 }
 
-pub(crate) fn persist_lock(lock: &HashMap<String, HashMap<String, String>>, project_root: &PathBuf) {
+pub(crate) fn persist_lock(lock: &HashMap<String, HashMap<String, String>>, project_root: &Path) {
 	match write_lock_file(project_root, lock) {
 		Ok(()) => log::debug!("Lock file updated!"),
 		Err(err) => log::error!("Error updating lock file: {}", err),
@@ -70,15 +70,15 @@ pub(crate) fn update_lock_entry(
 			metadata.extension.version_code.to_string(),
 		);
 		log::info!(
-            "Updated version_code for '{}' to {}",
-            metadata.extension.slug,
-            metadata.extension.version_code
-        );
+			"Updated version_code for '{}' to {}",
+			metadata.extension.slug,
+			metadata.extension.version_code
+		);
 	} else {
 		log::error!(
-            "Cannot update version_code: '{}' not found in metadata lock",
-            metadata.extension.slug
-        );
+			"Cannot update version_code: '{}' not found in metadata lock",
+			metadata.extension.slug
+		);
 	}
 }
 
@@ -116,7 +116,7 @@ pub(crate) fn check_extensions_against_lock(
 }
 
 pub(crate) fn remove_stale_entries_from_lock(
-	project_root: &PathBuf,
+	project_root: &Path,
 	lock_data: &mut HashMap<String, HashMap<String, String>>,
 	stale_slugs: &[String],
 ) {
@@ -125,7 +125,7 @@ pub(crate) fn remove_stale_entries_from_lock(
 		log::info!("Removed stale lock entry: {}", slug);
 	}
 
-	if let Err(err) = write_lock_file(&project_root, &lock_data) {
+	if let Err(err) = write_lock_file(project_root, lock_data) {
 		log::error!("Failed to write metadata-lock.toml: {}", err);
 	}
 }

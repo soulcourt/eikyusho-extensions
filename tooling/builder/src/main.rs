@@ -2,10 +2,10 @@ use eks_validator::structs::Metadata;
 use std::collections::HashMap;
 use std::{fs, path::PathBuf, process::Command};
 
-mod lock;
-mod util;
 mod binary;
+mod lock;
 mod server;
+mod util;
 
 fn main() {
 	env_logger::init();
@@ -26,7 +26,12 @@ fn main() {
 
 	let mut all_metadata = vec![];
 
-	process_languages(&extensions_src_dir, &project_root, &mut lock, &mut all_metadata);
+	process_languages(
+		&extensions_src_dir,
+		&project_root,
+		&mut lock,
+		&mut all_metadata,
+	);
 
 	let stale = lock::check_extensions_against_lock(&lock, &extensions_src_dir);
 
@@ -40,7 +45,7 @@ fn main() {
 fn process_languages(
 	extensions_src_dir: &PathBuf,
 	project_root: &PathBuf,
-	mut lock: &mut HashMap<String, HashMap<String, String>>,
+	lock: &mut HashMap<String, HashMap<String, String>>,
 	all_metadata: &mut Vec<Metadata>,
 ) {
 	for lang in fs::read_dir(extensions_src_dir).unwrap() {
@@ -54,38 +59,38 @@ fn process_languages(
 			);
 		}
 
-		process_extensions_in_language(&lang_path, &project_root, &mut lock, all_metadata);
+		process_extensions_in_language(&lang_path, project_root, lock, all_metadata);
 	}
 }
 
 fn process_extensions_in_language(
 	lang_path: &PathBuf,
 	project_root: &PathBuf,
-	mut lock: &mut HashMap<String, HashMap<String, String>>,
+	lock: &mut HashMap<String, HashMap<String, String>>,
 	all_metadata: &mut Vec<Metadata>,
 ) {
-	for ext_entry in fs::read_dir(&lang_path).unwrap() {
+	for ext_entry in fs::read_dir(lang_path).unwrap() {
 		let ext_path = ext_entry.unwrap().path();
 
 		if !ext_path.is_dir() || !util::has_cargo_toml(&ext_path) {
 			continue;
 		}
 
-		let metadata = match util::read_and_validate_metadata(&ext_path, &project_root) {
+		let metadata = match util::read_and_validate_metadata(&ext_path, project_root) {
 			Some(m) => m,
 			None => return,
 		};
 
 		all_metadata.push(metadata.clone());
 
-		if should_build(&metadata, &project_root, &mut lock) {
+		if should_build(&metadata, project_root, lock) {
 			let extension_built = build_extension(&ext_path);
 			if extension_built {
 				binary::generate_extension_binary(
 					&ext_path,
 					&metadata.extension.slug,
-					&project_root,
-					&lock,
+					project_root,
+					lock,
 				);
 			}
 		}
@@ -95,31 +100,28 @@ fn process_extensions_in_language(
 fn should_build(
 	metadata: &Metadata,
 	project_root: &PathBuf,
-	mut lock: &mut HashMap<String, HashMap<String, String>>,
+	lock: &mut HashMap<String, HashMap<String, String>>,
 ) -> bool {
 	match lock.contains_key(&metadata.extension.slug) {
 		true => {
-			let build_required = lock::extension_requires_build(&metadata, &lock);
+			let build_required = lock::extension_requires_build(metadata, lock);
 
 			if build_required {
-				lock::update_lock_entry(&mut lock, &metadata);
-				lock::persist_lock(&lock, &project_root);
+				lock::update_lock_entry(lock, metadata);
+				lock::persist_lock(lock, project_root);
 			}
 
 			build_required
-		},
+		}
 		false => {
-			lock::add_entry_to_lock(&mut lock, &metadata);
-			lock::persist_lock(&lock, &project_root);
+			lock::add_entry_to_lock(lock, metadata);
+			lock::persist_lock(lock, project_root);
 			true
 		}
 	}
 }
 
-
-
-
-fn build_extension(extension_path: &PathBuf) ->  bool {
+fn build_extension(extension_path: &PathBuf) -> bool {
 	let status = Command::new("cargo")
 		.arg("+nightly")
 		.arg("build")
@@ -138,4 +140,3 @@ fn build_extension(extension_path: &PathBuf) ->  bool {
 		false
 	}
 }
-

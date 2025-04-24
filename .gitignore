@@ -16,7 +16,7 @@ src/as/*/.wireit
 .zed
 
 # Production
-/extensions
+/extensions/
 /metadata-lock.toml
 /index.min.json
 /index.json
